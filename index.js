@@ -4,9 +4,7 @@ const server = express();
 const register = new client.Registry();
 
 client.collectDefaultMetrics({ prefix: 'node_', timeout: 5000, register });
-var username = 'admin' , password = 'public' , auth = "Basic " + Buffer.from(username + ":" + password).toString("base64");
 
-//var username = `${user}` , password = `${pass}` , auth = "Basic " + Buffer.from(username + ":" + password).toString("base64");
 var request = require('request');
 var _metricsResult = [], _nodesResult = [], metricsData = [], clusterKeys = [], clusterValues = [];
 const endpoint = process.env.EMQX_ENDPOINT; 
@@ -14,6 +12,7 @@ const emqxnode = process.env.EMQX_NODE;
 const user = process.env.USERNAME, pass = process.env.PASSWORD, port = process.env.PORT;
 const gaugeList = []
 var metricValues = [];
+var username = `${user}` , password = `${pass}` , auth = "Basic " + Buffer.from(username + ":" + password).toString("base64");
 
 function queryMetrics() {
   var url = `${endpoint}/api/v3/nodes/${emqxnode}/metrics/`;
@@ -63,29 +62,32 @@ function queryNodes() {
 }
 
 function combineMetrics() {
-   var metricKeys = [], nodesData = [];
+   var metricKeys = [], nodesData = [], count = 0;
    const regex = /\./g;
    var nodeKeys = ["connections", "memory_total", "memory_used", "process_available", "process_used", "node_status"];
 
    metricsData = _metricsResult.data;
+   if (_nodesResult.data["node_status"] == "Running") {
+      count += 1;
+   }
 
    for (let j = 0; j < (nodeKeys.length); j++) {
       nodesData.push(parseFloat(_nodesResult.data[nodeKeys[j]])); 
    }
-      console.log(nodesData)
+
+   if (count == 1) {
+      nodesData[nodeKeys.indexOf("node_status")] = 1;
+   }
+   else {
+      nodesData[nodeKeys.indexOf("node_status")] = 0;
+   }
+
    var keys = Object.keys(metricsData);
 
    metricValues = Object.values(metricsData);
    for (let i = 0; i < keys.length; i++) {
       metricKeys[i] = keys[i].replace(regex, '_');
    }
-
-   if (_nodesResult.data["node_status"] == "Running") {
-    nodesData[nodeKeys.indexOf("node_status")] = 1;
-}
-else {
-    nodesData[nodeKeys.indexOf("node_status")] = 0;
-}
 
    clusterKeys = [...metricKeys, ...nodeKeys];
    clusterValues = [...metricValues, ...nodesData];
@@ -137,4 +139,4 @@ function registerMetric() {
 registerMetric();       // Registers the metrics for /metrics & /nodes APIs 
 
 console.log('Server listening to ' + `${port}` + ', metrics exposed on /metrics endpoint');
-server.listen(8888); 
+server.listen(`${port}`); 
